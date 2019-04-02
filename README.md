@@ -32,11 +32,11 @@ Applies the accelerometer calibration parameters computed by the do_calib node. 
 #### Topics
 
 ##### Subscribed Topics
-- `raw` (sensor_msgs/Imu) <br>
+- `/imu/data_raw` (sensor_msgs/Imu) <br>
   The raw, uncalibrated IMU measurements
 
 ##### Published Topics
-- `corrected` (sensor_msgs/Imu) <br>
+- `/imu/data` (sensor_msgs/Imu) <br>
   The corrected, calibrated IMU measurements
 
 #### Parameters
@@ -46,3 +46,7 @@ Applies the accelerometer calibration parameters computed by the do_calib node. 
   Whether to compute gyro biases at startup and subsequently subtract them off
 - `~gyro_calib_samples` (int, default: 100) <br>
   The number of measurements to use for computing the gyro biases
+  - `~null_accelerometer` (bool, default: true) <br>
+  Whether to compute accelerometer null biases at startup and subsequently subtract them off
+- `~null_accelerometer_samples_` (int, default: 100) <br>
+  The number of measurements to use for computing the accelerometer null biases

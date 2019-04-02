@@ -63,10 +63,18 @@ private:
   bool calibrate_gyros_;
   int gyro_calib_samples_;
   int gyro_sample_count_;
-
+  
   double gyro_bias_x_;
   double gyro_bias_y_;
   double gyro_bias_z_;
+  
+  bool null_accelerometer_;
+  int null_accelerometer_samples_;
+  int accel_sample_count_;
+  
+  double accel_bias_x_;
+  double accel_bias_y_;
+  double accel_bias_z_;
 };
 
 } // namespace accel_calib

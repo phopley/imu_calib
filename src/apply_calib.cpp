@@ -48,7 +48,11 @@ ApplyCalib::ApplyCalib() :
   gyro_sample_count_(0),
   gyro_bias_x_(0.0),
   gyro_bias_y_(0.0),
-  gyro_bias_z_(0.0)
+  gyro_bias_z_(0.0),
+  accel_sample_count_(0),
+  accel_bias_x_(0.0),
+  accel_bias_y_(0.0),
+  accel_bias_z_(0.0)
 {
   ros::NodeHandle nh;
   ros::NodeHandle nh_private("~");
@@ -64,12 +68,12 @@ ApplyCalib::ApplyCalib() :
 
   nh_private.param<bool>("calibrate_gyros", calibrate_gyros_, true);
   nh_private.param<int>("gyro_calib_samples", gyro_calib_samples_, 100);
+  
+  nh_private.param<bool>("null_accelerometer", null_accelerometer_, true);
+  nh_private.param<int>("null_accelerometer_samples", null_accelerometer_samples_, 100);  
 
-  int queue_size;
-  nh_private.param<int>("queue_size", queue_size, 5);
-
-  raw_sub_ = nh.subscribe("raw", queue_size, &ApplyCalib::rawImuCallback, this);
-  corrected_pub_ = nh.advertise<sensor_msgs::Imu>("corrected", queue_size);
+  raw_sub_ = nh.subscribe("/imu/data_raw", 5, &ApplyCalib::rawImuCallback, this);
+  corrected_pub_ = nh.advertise<sensor_msgs::Imu>("/imu/data", 5);
 }
 
 void ApplyCalib::rawImuCallback(sensor_msgs::Imu::ConstPtr raw)
@@ -89,20 +93,47 @@ void ApplyCalib::rawImuCallback(sensor_msgs::Imu::ConstPtr raw)
       ROS_INFO("Gyro calibration complete! (bias = [%.3f, %.3f, %.3f])", gyro_bias_x_, gyro_bias_y_, gyro_bias_z_);
       calibrate_gyros_ = false;
     }
-
-    return;
   }
+  
+  if(null_accelerometer_ == true)
+  {
+    ROS_INFO_ONCE("Nulling accelerometer; do not move the IMU");
+    
+    // Recursively compute mean accelerometer measurements from corrected acceleration readings
+    sensor_msgs::Imu corrected = *raw;
+    accel_sample_count_++;
 
-  sensor_msgs::Imu corrected = *raw;
+    calib_.applyCalib(raw->linear_acceleration.x, raw->linear_acceleration.y, raw->linear_acceleration.z,
+                      &corrected.linear_acceleration.x, &corrected.linear_acceleration.y, &corrected.linear_acceleration.z);
+                      
+    accel_bias_x_ = ((accel_sample_count_ - 1) * accel_bias_x_ + corrected.linear_acceleration.x) / accel_sample_count_;    
+    accel_bias_y_ = ((accel_sample_count_ - 1) * accel_bias_y_ + corrected.linear_acceleration.y) / accel_sample_count_;
+    accel_bias_z_ = ((accel_sample_count_ - 1) * accel_bias_z_ + (corrected.linear_acceleration.z-9.80665)) / accel_sample_count_;
 
-  calib_.applyCalib(raw->linear_acceleration.x, raw->linear_acceleration.y, raw->linear_acceleration.z,
-                    &corrected.linear_acceleration.x, &corrected.linear_acceleration.y, &corrected.linear_acceleration.z);
+    if (accel_sample_count_ >= null_accelerometer_samples_)
+    {
+      ROS_INFO("Nulling accelerometers complete! (bias = [%.3f, %.3f, %.3f])", accel_bias_x_, accel_bias_y_, accel_bias_z_);
+      null_accelerometer_ = false;
+    }    
+  }
+  
+  if((null_accelerometer_ == false) && (calibrate_gyros_ == false))
+  {
+    sensor_msgs::Imu corrected = *raw;
 
-  corrected.angular_velocity.x -= gyro_bias_x_;
-  corrected.angular_velocity.y -= gyro_bias_y_;
-  corrected.angular_velocity.z -= gyro_bias_z_;
+    calib_.applyCalib(raw->linear_acceleration.x, raw->linear_acceleration.y, raw->linear_acceleration.z,
+                      &corrected.linear_acceleration.x, &corrected.linear_acceleration.y, &corrected.linear_acceleration.z);
+                      
+    corrected.linear_acceleration.x -= accel_bias_x_;
+    corrected.linear_acceleration.y -= accel_bias_y_;
+    corrected.linear_acceleration.z -= accel_bias_z_;
 
-  corrected_pub_.publish(corrected);
+    corrected.angular_velocity.x -= gyro_bias_x_;
+    corrected.angular_velocity.y -= gyro_bias_y_;
+    corrected.angular_velocity.z -= gyro_bias_z_;
+
+    corrected_pub_.publish(corrected);
+  }
 }
 
 } // namespace accel_calib
