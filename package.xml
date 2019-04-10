@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <package format="2">
   <name>imu_calib</name>
-  <version>0.0.0</version>
+  <version>1.0.0</version>
   <description>Package for computing and applying IMU calibrations</description>
 
   <author email="daniel.p.koch@gmail.com">Daniel Koch</author>
